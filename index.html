@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ChessForge — Analysis Board</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<!-- Header -->
+<header class="top-bar">
+  <div class="logo">
+    <span class="logo-icon">♟</span>
+    <span class="logo-text">Chess<strong>Forge</strong></span>
+  </div>
+  <nav class="top-nav">
+    <button class="nav-btn active" id="nav-analysis" onclick="switchTab('analysis')">⚡ Analysis</button>
+    <button class="nav-btn" id="nav-database" onclick="switchTab('database')">☁ Chess.com Games</button>
+    <button class="nav-btn" onclick="openModal('import-modal')">↑ Import PGN</button>
+    <button class="nav-btn" onclick="openModal('fen-modal')">⊞ Load FEN</button>
+    <button class="nav-btn" id="nav-edit" onclick="toggleEditMode()">✎ Edit Board</button>
+  </nav>
+  <div class="engine-status">
+    <span class="engine-dot" id="engine-dot"></span>
+    <span id="engine-label">Loading Engine…</span>
+  </div>
+</header>
+
+<main class="main-layout">
+
+  <!-- Board section -->
+  <section class="board-section">
+    <div class="board-wrapper">
+
+      <!-- Eval bar -->
+      <div class="eval-bar-container">
+        <div class="eval-score top" id="eval-top">+0.0</div>
+        <div class="eval-bar">
+          <div class="eval-fill" id="eval-fill"></div>
+        </div>
+        <div class="eval-score bottom" id="eval-bottom">+0.0</div>
+      </div>
+
+      <!-- Board -->
+      <div class="board-container">
+        <div class="coord-row" id="coord-files-top"></div>
+        <div class="board-inner">
+          <div class="coord-col" id="coord-ranks-left"></div>
+          <div class="board-wrap" id="board-wrap">
+            <div class="chessboard" id="chessboard"></div>
+            <!-- SVG layer for arrows -->
+            <svg class="arrow-svg" id="arrow-svg" viewBox="0 0 560 560" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arr-best" markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto">
+                  <polygon points="0,0 5,2.5 0,5" fill="rgba(0,200,90,0.95)"/>
+                </marker>
+                <marker id="arr-ponder" markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto">
+                  <polygon points="0,0 5,2.5 0,5" fill="rgba(80,150,255,0.85)"/>
+                </marker>
+                <marker id="arr-user" markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto">
+                  <polygon points="0,0 5,2.5 0,5" fill="rgba(255,140,0,0.9)"/>
+                </marker>
+              </defs>
+            </svg>
+            <!-- Promotion picker -->
+            <div class="promotion-overlay" id="promotion-overlay" style="display:none;">
+              <div class="promotion-box" id="promotion-box"></div>
+            </div>
+          </div>
+          <div class="coord-col" id="coord-ranks-right"></div>
+        </div>
+        <div class="coord-row" id="coord-files-bottom"></div>
+      </div>
+
+    </div>
+
+    <!-- Controls -->
+    <div class="board-controls">
+      <button class="ctrl-btn" onclick="flipBoard()">⇅ Flip</button>
+      <div class="ctrl-sep"></div>
+      <button class="ctrl-btn icon-btn" onclick="goToStart()" title="First move">⏮</button>
+      <button class="ctrl-btn icon-btn" onclick="goBack()" title="Back">◀</button>
+      <button class="ctrl-btn icon-btn" onclick="goForward()" title="Forward">▶</button>
+      <button class="ctrl-btn icon-btn" onclick="goToEnd()" title="Last move">⏭</button>
+      <div class="ctrl-sep"></div>
+      <button class="ctrl-btn danger" onclick="resetBoard()">↺ Reset</button>
+      <button class="ctrl-btn" onclick="copyFEN()">⎘ FEN</button>
+    </div>
+  </section>
+
+  <!-- Side panel -->
+  <aside class="side-panel">
+
+    <!-- Analysis tab -->
+    <div id="tab-analysis" class="tab-content active">
+
+      <div class="panel-card engine-card">
+        <div class="panel-header">
+          <h3 class="panel-title"><span class="panel-icon">⚡</span>Stockfish 18</h3>
+          <div class="engine-controls">
+            <label class="ctrl-label">Depth
+              <input type="number" id="engine-depth" value="20" min="5" max="40" class="number-input"/>
+            </label>
+            <label class="ctrl-label">Lines
+              <input type="number" id="engine-multipv" value="3" min="1" max="5" class="number-input"/>
+            </label>
+            <button class="toggle-btn" id="engine-toggle" onclick="toggleEngine()">
+              <span class="toggle-dot"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="eval-display">
+          <div class="eval-main" id="eval-main">0.00</div>
+          <div class="eval-meta">
+            <span id="eval-depth-display">Depth —</span>
+            <span id="eval-nps-display"></span>
+          </div>
+        </div>
+
+        <div class="bestmove-row">
+          <div class="bm-chip green-chip">
+            <span class="bm-dot"></span>
+            <span class="bm-label">Best</span>
+            <span class="bm-val" id="bestmove-val">—</span>
+          </div>
+          <div class="bm-chip blue-chip">
+            <span class="bm-dot"></span>
+            <span class="bm-label">Ponder</span>
+            <span class="bm-val" id="ponder-val">—</span>
+          </div>
+        </div>
+
+        <div class="lines-container" id="lines-container"></div>
+      </div>
+
+      <div class="panel-card moves-card">
+        <div class="panel-header">
+          <h3 class="panel-title"><span class="panel-icon">📋</span>Move History</h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="small-btn" onclick="copyPGN()">Copy PGN</button>
+            <button class="review-btn" id="review-btn" onclick="reviewGame()">🔍 Review Game</button>
+          </div>
+        </div>
+        <!-- Progress bar shown during review -->
+        <div id="review-progress" style="display:none" class="review-progress-wrap">
+          <div class="review-progress-bar-bg">
+            <div class="review-progress-bar-fill" id="review-progress-bar"></div>
+          </div>
+          <div class="review-progress-text" id="review-progress-text">Preparing…</div>
+        </div>
+        <div class="moves-list" id="moves-list">
+          <span class="moves-empty">Make a move to begin.</span>
+        </div>
+        <!-- Summary shown after review -->
+        <div id="review-summary" style="display:none"></div>
+      </div>
+
+      <div class="panel-card info-card">
+        <div class="panel-header">
+          <h3 class="panel-title"><span class="panel-icon">ℹ</span>Position Info</h3>
+        </div>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">Turn</span>
+            <span class="info-val" id="info-turn">White</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Castling</span>
+            <span class="info-val" id="info-castling">KQkq</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">En Passant</span>
+            <span class="info-val" id="info-ep">—</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Half Moves</span>
+            <span class="info-val" id="info-halfmove">0</span>
+          </div>
+          <div class="info-item full">
+            <span class="info-label">FEN</span>
+            <span class="info-val mono" id="info-fen">rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chess.com Database tab -->
+    <div id="tab-database" class="tab-content">
+      <div class="panel-card db-card">
+        <div class="panel-header">
+          <h3 class="panel-title"><span class="panel-icon">☁</span>Chess.com Database</h3>
+        </div>
+
+        <div class="db-search-area">
+          <div class="db-input-row">
+            <input type="text" id="db-username" class="db-input" placeholder="Enter Chess.com username…"
+              onkeydown="if(event.key==='Enter') fetchChesscomPlayer()"/>
+            <button class="db-search-btn" onclick="fetchChesscomPlayer()">
+              <span id="db-search-spinner" style="display:none">⏳</span>
+              <span id="db-search-text">Search</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Player profile -->
+        <div class="db-profile" id="db-profile" style="display:none">
+          <img class="db-avatar" id="db-avatar" src="" alt=""/>
+          <div class="db-profile-info">
+            <div class="db-profile-name" id="db-profile-name"></div>
+            <div class="db-profile-sub" id="db-profile-sub"></div>
+          </div>
+          <div class="db-ratings" id="db-ratings"></div>
+        </div>
+
+        <!-- Filters -->
+        <div class="db-filters" id="db-filters" style="display:none">
+          <div class="db-filter-row">
+            <select id="db-year" class="db-select"></select>
+            <select id="db-month" class="db-select"></select>
+          </div>
+          <div class="db-filter-row">
+            <select id="db-gametype" class="db-select">
+              <option value="">All game types</option>
+              <option value="bullet">Bullet</option>
+              <option value="blitz">Blitz</option>
+              <option value="rapid">Rapid</option>
+              <option value="daily">Daily</option>
+            </select>
+            <select id="db-color" class="db-select">
+              <option value="">Any color</option>
+              <option value="white">As White</option>
+              <option value="black">As Black</option>
+            </select>
+            <select id="db-result" class="db-select">
+              <option value="">Any result</option>
+              <option value="win">Wins</option>
+              <option value="loss">Losses</option>
+              <option value="draw">Draws</option>
+            </select>
+          </div>
+          <button class="db-load-btn" onclick="fetchGames()">Load Games</button>
+        </div>
+
+        <!-- Stats bar -->
+        <div class="db-stats-bar" id="db-stats-bar" style="display:none">
+          <div class="stat-pill win"><span id="stat-wins">0</span> W</div>
+          <div class="stat-bar-wrap">
+            <div class="stat-bar-fill win" id="bar-win"></div>
+            <div class="stat-bar-fill draw" id="bar-draw"></div>
+            <div class="stat-bar-fill loss" id="bar-loss"></div>
+          </div>
+          <div class="stat-pill loss"><span id="stat-losses">0</span> L</div>
+          <div class="stat-pill draw"><span id="stat-draws">0</span> D</div>
+        </div>
+
+        <!-- Game list -->
+        <div class="db-list-header" id="db-list-header" style="display:none">
+          <span id="db-list-count"></span>
+        </div>
+        <div class="db-games-list" id="db-games-list">
+          <div class="db-empty">Enter a username above to search games.</div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+</main>
+
+<!-- Tambahkan Piece Palette Modal/Overlay - letakkan setelah board-wrap atau sebelum modals -->
+<!-- PIECE PALETTE (BOARD EDITOR) - DRAGGABLE + SVG PIECES -->
+<div class="piece-palette" id="piece-palette" style="display:none;">
+  <div class="palette-header" id="palette-header">
+    <span class="palette-title">✎ Board Editor</span>
+    <div class="palette-header-controls">
+      <button class="palette-minimize" onclick="toggleMinimizePalette()" title="Minimize">−</button>
+      <button class="palette-close" onclick="toggleEditMode()" title="Close">✕</button>
+    </div>
+  </div>
+  <div class="palette-content" id="palette-content">
+    <div class="palette-section">
+      <div class="palette-section-title">White Pieces</div>
+      <div class="palette-pieces" id="white-pieces">
+        <!-- Akan diisi oleh JavaScript dengan SVG pieces -->
+      </div>
+    </div>
+    <div class="palette-section">
+      <div class="palette-section-title">Black Pieces</div>
+      <div class="palette-pieces" id="black-pieces">
+        <!-- Akan diisi oleh JavaScript dengan SVG pieces -->
+      </div>
+    </div>
+    <div class="palette-footer">
+      <button class="palette-btn" onclick="clearBoard()">Clear Board</button>
+      <button class="palette-btn" onclick="resetToStart()">Reset</button>
+      <button class="palette-btn primary" onclick="doneEditing()">Done</button>
+    </div>
+    <div class="palette-status" id="palette-status">Click on empty square to place piece</div>
+  </div>
+</div>
+
+<!-- Modals -->
+<div class="modal-overlay" id="import-modal" onclick="closeModal(event,'import-modal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>Import PGN</h2>
+      <button class="modal-close" onclick="closeModal(null,'import-modal')">✕</button>
+    </div>
+    <textarea class="modal-textarea" id="pgn-input" placeholder="Paste PGN here…"></textarea>
+    <div class="modal-footer">
+      <button class="modal-btn secondary" onclick="closeModal(null,'import-modal')">Cancel</button>
+      <button class="modal-btn primary" onclick="importPGN()">Load Game</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="fen-modal" onclick="closeModal(event,'fen-modal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>Load FEN Position</h2>
+      <button class="modal-close" onclick="closeModal(null,'fen-modal')">✕</button>
+    </div>
+    <input type="text" class="modal-input" id="fen-input"
+      value="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"/>
+    <p class="modal-hint">Quick examples:</p>
+    <div class="fen-examples">
+      <button class="fen-example-btn" onclick="setFenExample('r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3')">Italian</button>
+      <button class="fen-example-btn" onclick="setFenExample('rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2')">Sicilian</button>
+      <button class="fen-example-btn" onclick="setFenExample('r1bqkbnr/pppp1ppp/2n5/4p3/4PP2/8/PPPP2PP/RNBQKBNR b KQkq f3 0 3')">King's Gambit</button>
+      <button class="fen-example-btn" onclick="setFenExample('rnbqkb1r/ppp1pppp/3p4/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq d3 0 3')">Queen's Gambit</button>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn secondary" onclick="closeModal(null,'fen-modal')">Cancel</button>
+      <button class="modal-btn primary" onclick="loadFEN()">Load</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
